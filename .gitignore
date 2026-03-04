@@ -1,0 +1,22 @@
+# Virtual environment
+venv/
+.venv/
+
+# ChromaDB vectorstore (large files, rebuild locally)
+vectorstore/
+
+# PDF source documents (too large for GitHub)
+data/raw/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Environment variables (never commit secrets)
+.env
+
+# OS files
+.DS_Store
+Thumbs.db
