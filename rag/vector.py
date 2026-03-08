@@ -1,58 +1,66 @@
 """
 rag/vector.py
 -------------
-Singleton ChromaDB client + MMR retriever.
+ChromaDB vectorstore singleton + MMR retriever.
 
-Why singleton?
-  - ChromaDB opens an SQLite file lock on Windows; re-opening it per request
-    causes errors and adds 300–800 ms overhead.
-  - The vectorstore is initialized ONCE at FastAPI startup via lifespan.
+Embeddings: Ollama nomic-embed-text (local, ~200MB RAM — fine)
+Storage:    ChromaDB persistent on disk (survives restarts)
+Retriever:  MMR (Maximum Marginal Relevance) — avoids returning
+            5 nearly-identical chunks; picks diverse relevant results
+
+Run scripts/ingest_documents.py ONCE before starting the server.
 """
 
-from langchain_community.embeddings import OllamaEmbeddings
+import chromadb
 from langchain_community.vectorstores import Chroma
-from langchain_core.vectorstores import VectorStoreRetriever
+from langchain_community.embeddings import OllamaEmbeddings
 
 from app.core.config import settings
 
-# ── module-level singletons ──────────────────────────────────────────────────
-_vectorstore: Chroma | None = None
+# ── Singletons ────────────────────────────────────────────────────────────────
+_vectorstore = None
+_retriever   = None
 
 
 def get_vectorstore() -> Chroma:
     """
-    Return (and lazily create) the ChromaDB vectorstore singleton.
-    Safe to call multiple times — only opens the DB once.
+    Build (or return cached) ChromaDB vectorstore.
+    Uses Ollama nomic-embed-text for embeddings — unchanged from original.
     """
     global _vectorstore
     if _vectorstore is None:
         embeddings = OllamaEmbeddings(
             base_url=settings.ollama_base_url,
-            model=settings.ollama_embed_model,   # nomic-embed-text, NOT mistral
+            model=settings.ollama_embed_model,   # nomic-embed-text
         )
+
+        client = chromadb.PersistentClient(path=settings.chroma_persist_dir)
+
         _vectorstore = Chroma(
-            persist_directory=settings.chroma_persist_dir,
-            embedding_function=embeddings,
+            client=client,
             collection_name=settings.chroma_collection_name,
+            embedding_function=embeddings,
         )
+
     return _vectorstore
 
 
-def get_retriever() -> VectorStoreRetriever:
+def get_retriever():
     """
-    MMR retriever — fetches 20 candidates then re-ranks for diversity,
-    returning the top-k most relevant AND non-redundant chunks.
+    MMR retriever: fetches fetch_k candidates, returns k diverse results.
 
-    lambda_mult:
-        1.0 = pure relevance (may return near-duplicates)
-        0.0 = pure diversity
-        0.6 = good balance for legal documents
+    WHY MMR over simple similarity search:
+      Legal docs repeat the same preamble/definitions across many pages.
+      MMR picks the most RELEVANT but also DIVERSE chunks — better context.
     """
-    return get_vectorstore().as_retriever(
-        search_type="mmr",
-        search_kwargs={
-            "k": settings.retriever_k,
-            "fetch_k": settings.retriever_fetch_k,
-            "lambda_mult": 0.6,
-        },
-    )
+    global _retriever
+    if _retriever is None:
+        vs = get_vectorstore()
+        _retriever = vs.as_retriever(
+            search_type="mmr",
+            search_kwargs={
+                "k":       settings.retriever_k,        # chunks returned
+                "fetch_k": settings.retriever_fetch_k,  # candidates to consider
+            },
+        )
+    return _retriever

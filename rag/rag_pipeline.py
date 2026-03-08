@@ -1,56 +1,46 @@
 """
 rag/rag_pipeline.py
 -------------------
-Builds the LangChain RAG chain:
-  question → retriever → format_docs → prompt → Ollama Mistral → str
+Builds two LangChain RAG chains using Groq:
 
-Key decisions:
-  - temperature=0.1  →  low creativity, high factual precision (law needs this)
-  - Prompt mandates citations and graceful "I don't know" responses
-  - format_docs injects [source | page] tags so the LLM can cite them
-  - Chain and retriever are singletons (built once, reused across requests)
+  1. get_chain()        → Legal Q&A   (question → cited answer)
+  2. get_advice_chain() → Legal Advice (problem → structured advice)
+
+Why Groq instead of Ollama:
+  - Groq runs Llama-3.1 on custom hardware in the cloud
+  - Free tier, no API cost for normal usage
+  - ~2-5s responses vs 15-40s local + no RAM crash
+
+Key change from Ollama version:
+  - ChatGroq (ChatModel) replaces Ollama (LLM)
+  - ChatPromptTemplate replaces PromptTemplate
+  - Chain input must be a dict: {"question": ...} not a raw string
 """
 
-from langchain_community.llms import Ollama
-from langchain_core.prompts import PromptTemplate
+from langchain_groq import ChatGroq
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 
 from app.core.config import settings
 from rag.vector import get_retriever
 
-# ── Legal-specific prompt ────────────────────────────────────────────────────
-LEGAL_PROMPT_TEMPLATE = """You are an expert legal assistant specializing in Indian law.
-Your answers are grounded ONLY in the provided context from:
-  - Constitution of India
-  - Indian Penal Code (IPC)
 
-STRICT RULES:
-1. Always cite the exact Article or Section number you are referencing.
-   Example: "As per Article 21 of the Constitution..." or "Under Section 302 IPC..."
-2. If the context does not contain enough information to answer the question,
-   respond with: "The provided legal documents do not cover this specific question.
-   Please consult a qualified lawyer."
-3. Do NOT add any information that is not present in the context below.
-4. Use formal, precise legal language.
-5. Structure your answer clearly: state the law, cite the source, explain it.
-
-CONTEXT (excerpts from legal documents):
-{context}
-
-QUESTION:
-{question}
-
-ANSWER (with Article/Section citations):"""
-
-LEGAL_PROMPT = PromptTemplate.from_template(LEGAL_PROMPT_TEMPLATE)
+# ── Shared LLM instance ───────────────────────────────────────────────────────
+def _build_llm() -> ChatGroq:
+    return ChatGroq(
+        model=settings.groq_model,        # llama-3.1-8b-instant
+        api_key=settings.groq_api_key,
+        temperature=0.1,                  # low = factual, not creative (law needs this)
+        max_tokens=1024,
+    )
 
 
-# ── Helper: format retrieved docs with source labels ─────────────────────────
+# ── Helper: format docs with inline citations ─────────────────────────────────
 def format_docs(docs: list) -> str:
     """
-    Prepend [source_file | Page X] to each chunk so the LLM
-    has the citation information inline in the context.
+    Prepend [source_file | Page X] to each chunk.
+    This gives the LLM citation info inline so it can reference it in the answer.
     """
     parts = []
     for doc in docs:
@@ -60,22 +50,45 @@ def format_docs(docs: list) -> str:
     return "\n\n---\n\n".join(parts)
 
 
-# ── Build LCEL chain ─────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+# CHAIN 1 — Legal Q&A
+# ══════════════════════════════════════════════════════════════════════════════
+
+LEGAL_QA_PROMPT = ChatPromptTemplate.from_template("""
+You are an expert legal assistant specializing in Indian law.
+Your answers are grounded ONLY in the context provided below from:
+  - Constitution of India
+  - Indian Penal Code (IPC)
+
+STRICT RULES:
+1. Always cite the exact Article or Section number you reference.
+   Examples: "As per Article 21..." or "Under Section 302 IPC..."
+2. If the context does not contain enough information, say:
+   "The provided legal documents do not cover this question. Please consult a qualified lawyer."
+3. Do NOT add any information not present in the context.
+4. Use formal, precise legal language.
+5. Structure: state the law → cite the source → explain it simply.
+
+CONTEXT (from legal documents):
+{context}
+
+QUESTION:
+{question}
+
+ANSWER (with Article/Section citations):
+""")
+
+
 def build_rag_chain():
     retriever = get_retriever()
-
-    llm = Ollama(
-        base_url=settings.ollama_base_url,
-        model=settings.ollama_llm_model,   # mistral
-        temperature=0.1,                    # low temp = factual, not creative
-    )
+    llm       = _build_llm()
 
     chain = (
         {
             "context":  retriever | RunnableLambda(format_docs),
             "question": RunnablePassthrough(),
         }
-        | LEGAL_PROMPT
+        | LEGAL_QA_PROMPT
         | llm
         | StrOutputParser()
     )
@@ -83,17 +96,80 @@ def build_rag_chain():
     return chain, retriever
 
 
-# ── Singletons ───────────────────────────────────────────────────────────────
-_chain     = None
-_retriever = None
+# ══════════════════════════════════════════════════════════════════════════════
+# CHAIN 2 — Legal Advice (describe a problem → structured advice)
+# ══════════════════════════════════════════════════════════════════════════════
+
+LEGAL_ADVICE_PROMPT = ChatPromptTemplate.from_template("""
+You are a senior Indian legal advisor helping someone understand their legal situation.
+Use ONLY the context provided from the Constitution of India and IPC.
+
+Respond in this exact structure:
+
+🔍 CASE TYPE:
+[Criminal / Civil / Constitutional / Mixed]
+
+📋 RELEVANT LAWS:
+[List specific Articles or IPC Sections that apply, with one-line explanation each]
+
+⚖️ YOUR LEGAL SITUATION:
+[Explain what the law says about their specific situation — clearly, in plain language]
+
+✅ STEPS TO TAKE RIGHT NOW:
+[Numbered list of immediate practical steps]
+
+⚠️ IMPORTANT WARNINGS:
+[Deadlines, risks, things NOT to do]
+
+👨‍⚖️ TYPE OF LAWYER TO CONSULT:
+[Specific type: criminal lawyer, civil lawyer, constitutional lawyer, etc.]
+
+---
+CONTEXT (from legal documents):
+{context}
+
+PROBLEM DESCRIBED:
+{problem}
+
+LEGAL ADVICE:
+""")
+
+
+def build_advice_chain():
+    retriever = get_retriever()
+    llm       = _build_llm()
+
+    chain = (
+        {
+            "context": retriever | RunnableLambda(format_docs),
+            "problem": RunnablePassthrough(),
+        }
+        | LEGAL_ADVICE_PROMPT
+        | llm
+        | StrOutputParser()
+    )
+
+    return chain, retriever
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Singletons — built once at startup, reused across all requests
+# ══════════════════════════════════════════════════════════════════════════════
+
+_qa_chain      = None
+_advice_chain  = None
+_retriever     = None
 
 
 def get_chain():
-    """
-    Return (and lazily build) the RAG chain + retriever singletons.
-    Called once at startup via FastAPI lifespan.
-    """
-    global _chain, _retriever
-    if _chain is None:
-        _chain, _retriever = build_rag_chain()
-    return _chain, _retriever
+    global _qa_chain, _retriever
+    if _qa_chain is None:
+        _qa_chain, _retriever = build_rag_chain()
+    return _qa_chain, _retriever
+
+
+def get_advice_chain():
+    global _advice_chain, _retriever
+    if _advice_chain is None:
+        _advice_chain, _retriever = build_advice_chain()
+    return _advice_chain, _retriever

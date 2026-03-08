@@ -1,16 +1,15 @@
 """
 app/api/chat.py
 ---------------
-FastAPI router with two endpoints:
+FastAPI router — three endpoints:
 
-  POST /api/v1/chat
-    - Returns full answer + source citations as JSON
-    - Uses asyncio.to_thread() so the blocking Ollama call
-      doesn't freeze the FastAPI event loop
+  POST /api/v1/chat          → Full answer + source citations (JSON)
+  POST /api/v1/chat/stream   → Token-by-token streaming (plain text)
+  POST /api/v1/advice        → Structured legal advice for a described problem
 
-  POST /api/v1/chat/stream
-    - Streams tokens one-by-one as plain text (Server-Sent Events style)
-    - Much better UX when Mistral takes 15–40s locally
+Key fix from Ollama version:
+  chain.invoke/stream now receives {"question": ...} dict — not a raw string.
+  ChatGroq (unlike Ollama LLM) is a ChatModel and requires dict input.
 """
 
 import asyncio
@@ -18,14 +17,19 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from rag.rag_pipeline import get_chain
+from rag.rag_pipeline import get_chain, get_advice_chain
 
 router = APIRouter()
 
 
-# ── Request / Response schemas ───────────────────────────────────────────────
+# ── Schemas ───────────────────────────────────────────────────────────────────
+
 class ChatRequest(BaseModel):
     question: str
+
+
+class AdviceRequest(BaseModel):
+    problem: str
 
 
 class SourceDocument(BaseModel):
@@ -38,13 +42,18 @@ class ChatResponse(BaseModel):
     sources: list[SourceDocument]
 
 
+class AdviceResponse(BaseModel):
+    advice: str
+    sources: list[SourceDocument]
+
+
 # ── POST /chat ────────────────────────────────────────────────────────────────
+
 @router.post("/chat", response_model=ChatResponse, summary="Ask a legal question")
 async def chat(request: ChatRequest):
     """
-    Accepts a natural-language question about Indian law.
-    Returns an answer grounded in the Constitution / IPC,
-    with citations to the source documents.
+    Ask anything about the Constitution of India or IPC.
+    Returns a cited answer grounded in the source documents.
     """
     if not request.question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
@@ -52,13 +61,13 @@ async def chat(request: ChatRequest):
     chain, retriever = get_chain()
 
     try:
-        # 1. Retrieve relevant chunks (fast — vector search)
         source_docs = await asyncio.to_thread(retriever.invoke, request.question)
 
-        # 2. Run full RAG chain (slow — LLM inference, 15–40s locally)
-        answer = await asyncio.to_thread(chain.invoke, request.question)
+        # Pass as dict — ChatGroq requires this (unlike plain Ollama LLM)
+        answer = await asyncio.to_thread(
+            chain.invoke, {"question": request.question}
+        )
 
-        # 3. Build source list from metadata
         sources = [
             SourceDocument(
                 source_file=doc.metadata.get("source_file", "unknown"),
@@ -74,13 +83,12 @@ async def chat(request: ChatRequest):
 
 
 # ── POST /chat/stream ─────────────────────────────────────────────────────────
+
 @router.post("/chat/stream", summary="Stream answer token by token")
 async def chat_stream(request: ChatRequest):
     """
-    Same as /chat but streams tokens progressively.
-    Use this in your frontend for real-time output.
-
-    Response: text/plain stream (connect with fetch + ReadableStream or EventSource)
+    Same as /chat but streams tokens as they arrive from Groq.
+    Groq is fast — expect ~2-5s to first token vs 15-40s with local Ollama.
     """
     if not request.question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
@@ -88,8 +96,42 @@ async def chat_stream(request: ChatRequest):
     chain, _ = get_chain()
 
     async def token_generator():
-        # chain.stream() yields tokens as they are produced by the LLM
-        for token in chain.stream(request.question):
+        # Pass as dict — this was the original crash on line 92
+        for token in chain.stream({"question": request.question}):
             yield token
 
     return StreamingResponse(token_generator(), media_type="text/plain")
+
+
+# ── POST /advice ──────────────────────────────────────────────────────────────
+
+@router.post("/advice", response_model=AdviceResponse, summary="Get legal advice for a problem")
+async def advice(request: AdviceRequest):
+    """
+    Describe your legal problem in plain language.
+    Returns structured advice: case type, relevant laws, steps to take, warnings.
+    """
+    if not request.problem.strip():
+        raise HTTPException(status_code=400, detail="Problem description cannot be empty.")
+
+    chain, retriever = get_advice_chain()
+
+    try:
+        source_docs = await asyncio.to_thread(retriever.invoke, request.problem)
+
+        answer = await asyncio.to_thread(
+            chain.invoke, {"problem": request.problem}
+        )
+
+        sources = [
+            SourceDocument(
+                source_file=doc.metadata.get("source_file", "unknown"),
+                page=doc.metadata.get("page", "unknown"),
+            )
+            for doc in source_docs
+        ]
+
+        return AdviceResponse(advice=answer, sources=sources)
+
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
