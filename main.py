@@ -19,19 +19,24 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.chat import router as chat_router
+from app.api.documents import router as documents_router
 from rag.rag_pipeline import get_chain, get_advice_chain
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("⚖️  Starting AI Legal Assistant...")
-    print("   Loading ChromaDB vectorstore...")
-    print("   Connecting to Groq API (Llama-3.1-8b-instant)...")
-    get_chain()
-    get_advice_chain()
-    print("✅  Legal AI Assistant is ready!\n")
+    print("Starting AI Legal Assistant...")
+    print("Loading ChromaDB vectorstore...")
+    print("Connecting to Groq API (Llama-3.1-8b-instant)...")
+    try:
+        get_chain()
+        get_advice_chain()
+        print("Legal AI Assistant is ready!\n")
+    except Exception as exc:
+        print(f"Startup warning: {exc}")
+        print("App started, but chat endpoints require a valid GROQ_API_KEY.\n")
     yield
-    print("⏹️  Shutting down...")
+    print("Shutting down...")
 
 
 app = FastAPI(
@@ -39,8 +44,8 @@ app = FastAPI(
     description=(
         "RAG-powered assistant for Indian law.\n\n"
         "Sources: Constitution of India, Indian Penal Code (IPC)\n"
-        "LLM: Groq · Llama-3.1-8b-instant (free API)\n"
-        "Embeddings: Ollama · nomic-embed-text (local)"
+        "LLM: Groq - Llama-3.1-8b-instant (free API)\n"
+        "Embeddings: Ollama - nomic-embed-text (local)"
     ),
     version="2.0.0",
     lifespan=lifespan,
@@ -54,6 +59,7 @@ app.add_middleware(
 )
 
 app.include_router(chat_router, prefix="/api/v1", tags=["Legal Chat"])
+app.include_router(documents_router, prefix="/api/v1", tags=["Documents"])
 
 
 @app.get("/health", tags=["Health"])

@@ -49,6 +49,21 @@ class AdviceResponse(BaseModel):
 
 # ── POST /chat ────────────────────────────────────────────────────────────────
 
+def _retrieve_documents(retriever, query: str):
+    """Return list of docs from retriever (compatible with LangChain versions)."""
+    if hasattr(retriever, "get_relevant_documents"):
+        return retriever.get_relevant_documents(query)
+    if hasattr(retriever, "get_documents"):
+        return retriever.get_documents(query)
+    if hasattr(retriever, "invoke"):
+        try:
+            return retriever.invoke(query)
+        except TypeError:
+            return retriever.invoke({"query": query})
+
+    raise RuntimeError("Retriever object has no supported retrieval method")
+
+
 @router.post("/chat", response_model=ChatResponse, summary="Ask a legal question")
 async def chat(request: ChatRequest):
     """
@@ -61,7 +76,7 @@ async def chat(request: ChatRequest):
     chain, retriever = get_chain()
 
     try:
-        source_docs = await asyncio.to_thread(retriever.invoke, request.question)
+        source_docs = await asyncio.to_thread(_retrieve_documents, retriever, request.question)
 
         # Pass as dict — ChatGroq requires this (unlike plain Ollama LLM)
         answer = await asyncio.to_thread(
@@ -96,9 +111,14 @@ async def chat_stream(request: ChatRequest):
     chain, _ = get_chain()
 
     async def token_generator():
-        # Pass as dict — this was the original crash on line 92
-        for token in chain.stream({"question": request.question}):
-            yield token
+        stream_iter = chain.stream({"question": request.question})
+
+        if hasattr(stream_iter, "__aiter__"):
+            async for token in stream_iter:
+                yield token
+        else:
+            for token in stream_iter:
+                yield token
 
     return StreamingResponse(token_generator(), media_type="text/plain")
 
@@ -117,7 +137,7 @@ async def advice(request: AdviceRequest):
     chain, retriever = get_advice_chain()
 
     try:
-        source_docs = await asyncio.to_thread(retriever.invoke, request.problem)
+        source_docs = await asyncio.to_thread(_retrieve_documents, retriever, request.problem)
 
         answer = await asyncio.to_thread(
             chain.invoke, {"problem": request.problem}

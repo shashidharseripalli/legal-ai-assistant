@@ -7,6 +7,7 @@ vectorstore/
 
 # PDF source documents (too large for GitHub)
 data/raw/
+data/uploads/
 
 # Python cache
 __pycache__/
