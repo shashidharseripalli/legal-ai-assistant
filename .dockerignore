@@ -1,0 +1,16 @@
+.git
+.gitignore
+.env
+venv/
+.venv/
+__pycache__/
+.pytest_cache/
+vectorstore/
+data/raw/
+data/uploads/
+*.pyc
+*.pyo
+*.pyd
+*.log
+Thumbs.db
+.DS_Store

@@ -258,3 +258,48 @@ Pull requests are welcome. For major changes, please open an issue first.
 ## 📄 License
 
 MIT License
+
+---
+
+## Docker
+
+You can run both backend and Streamlit UI with Docker Compose.
+
+### 1. Prepare environment
+
+```bash
+cp .env.example .env
+```
+
+Set your real `GROQ_API_KEY` in `.env`.
+
+### 2. Make sure Ollama is running on your host
+
+```bash
+ollama pull nomic-embed-text
+```
+
+### 3. Build and start
+
+```bash
+docker compose up --build
+```
+
+- FastAPI: `http://localhost:8000`
+- Streamlit: `http://localhost:8501`
+
+The backend container stores data in mounted folders:
+- `./vectorstore` for ChromaDB
+- `./data` for input/uploaded documents
+
+### 4. Optional: run ingestion inside container
+
+```bash
+docker compose run --rm backend python scripts/ingest_documents.py
+```
+
+### 5. Stop
+
+```bash
+docker compose down
+```

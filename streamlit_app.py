@@ -8,6 +8,7 @@ Run after starting the FastAPI backend:
   Terminal 2: streamlit run streamlit_app.py
 """
 
+import os
 from uuid import uuid4
 
 import requests
@@ -22,13 +23,14 @@ st.set_page_config(
 )
 
 # Constants
-API_BASE = "http://localhost:8000/api/v1"
+BACKEND_BASE_URL = os.getenv("BACKEND_BASE_URL", "http://localhost:8000").rstrip("/")
+API_BASE = f"{BACKEND_BASE_URL}/api/v1"
 CHAT_URL = f"{API_BASE}/chat"
 STREAM_URL = f"{API_BASE}/chat/stream"
 ADVICE_URL = f"{API_BASE}/advice"
 UPLOAD_URL = f"{API_BASE}/documents/upload"
 IMPACT_URL = f"{API_BASE}/documents/impact"
-HEALTH_URL = "http://localhost:8000/health"
+HEALTH_URL = f"{BACKEND_BASE_URL}/health"
 
 # CSS
 st.markdown(
