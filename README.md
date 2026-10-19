@@ -49,7 +49,8 @@ legal-ai-assistant/
 │       └── ipc.pdf                     ← legacy matters where applicable
 │
 ├── scripts/
-│   └── ingest_documents.py      ← Run once to chunk, embed, and store PDFs
+│   ├── download_legal_corpus.py ← Download official BNS/BNSS/BSA PDFs
+│   └── ingest_documents.py      ← Chunk, embed, and store all PDFs in data/raw/
 │
 ├── vectorstore/                 ← Auto-created by ChromaDB after ingestion
 │
@@ -115,8 +116,12 @@ Open `.env` and add your Groq API key:
 GROQ_API_KEY=gsk_your_actual_key_here
 ```
 
-### 8. Add your PDF documents
-Place authoritative PDFs inside `data/raw/`. At minimum, add the statutes needed for your intended questions. For current Indian criminal-law questions, use the official [Ministry of Home Affairs New Criminal Laws page](https://www.mha.gov.in/en/commoncontent/new-criminal-laws) to obtain the Bharatiya Nyaya Sanhita (BNS), Bharatiya Nagarik Suraksha Sanhita (BNSS), and Bharatiya Sakshya Adhiniyam (BSA), along with the Constitution if you need constitutional questions. Keep legacy laws such as the IPC/CrPC/Indian Evidence Act for historical matters where they may still be relevant. The app only knows the documents you index; PDFs are not bundled in this repository.
+### 8. Download the official criminal-law corpus
+Run:
+```bash
+python scripts/download_legal_corpus.py
+```
+This downloads the Bharatiya Nyaya Sanhita (BNS), Bharatiya Nagarik Suraksha Sanhita (BNSS), and Bharatiya Sakshya Adhiniyam (BSA) PDFs linked from the official [Ministry of Home Affairs New Criminal Laws page](https://www.mha.gov.in/en/commoncontent/new-criminal-laws). Add an authoritative Constitution of India PDF to `data/raw/` if you want constitutional questions. Add older statutes such as the IPC/CrPC/Indian Evidence Act when handling historical matters where they may still apply. The PDFs are not committed to this repository.
 
 ### 9. Run document ingestion (ONE TIME only)
 ```bash
