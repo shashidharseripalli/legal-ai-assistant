@@ -3,7 +3,7 @@
 A production-quality RAG (Retrieval-Augmented Generation) application for Indian law.
 Ask legal questions or describe your problem — get grounded answers with citations.
 
-**Sources:** Constitution of India · Indian Penal Code (IPC)  
+**Sources:** Official legal PDFs indexed from `data/raw/` (include the Constitution and current laws relevant to your use case)  
 **LLM:** Groq · Llama-3.1-8b-instant (free API, no RAM crash)  
 **Embeddings:** Ollama · nomic-embed-text (local, lightweight)  
 **Stack:** FastAPI · LangChain · ChromaDB · Streamlit · Python 3.10+
@@ -12,7 +12,7 @@ Ask legal questions or describe your problem — get grounded answers with citat
 
 ## ✨ Features
 
-- 💬 **Legal Q&A Chat** — Ask anything about the Constitution or IPC, get cited answers
+- 💬 **Legal Q&A Chat** — Ask questions grounded in the legal PDFs you have indexed, with citations
 - 🆘 **Legal Problem Advisor** — Describe your situation, get structured step-by-step advice
 - ⚡ **Streaming responses** — See answers appear token by token in real time
 - 📚 **Source citations** — Every answer shows which PDF and page it came from
@@ -78,7 +78,7 @@ This is only ~270MB and uses very little RAM. It's only for embeddings, not the 
 
 ### 4. Clone the repository
 ```bash
-git clone https://github.com/YOUR_USERNAME/legal-ai-assistant.git
+git clone https://github.com/shashidharseripalli/legal-ai-assistant.git
 cd legal-ai-assistant
 ```
 
@@ -113,9 +113,7 @@ GROQ_API_KEY=gsk_your_actual_key_here
 ```
 
 ### 8. Add your PDF documents
-Place the following files inside `data/raw/`:
-- `constitution_of_india.pdf`
-- `ipc.pdf`
+Place authoritative PDFs inside `data/raw/`. At minimum, add the statutes needed for your intended questions. For current Indian criminal-law questions, use the official [Ministry of Home Affairs New Criminal Laws page](https://www.mha.gov.in/en/commoncontent/new-criminal-laws) to obtain the Bharatiya Nyaya Sanhita (BNS), Bharatiya Nagarik Suraksha Sanhita (BNSS), and Bharatiya Sakshya Adhiniyam (BSA), along with the Constitution if you need constitutional questions. Keep legacy laws such as the IPC/CrPC/Indian Evidence Act for historical matters where they may still be relevant. The app only knows the documents you index; PDFs are not bundled in this repository.
 
 ### 9. Run document ingestion (ONE TIME only)
 ```bash
