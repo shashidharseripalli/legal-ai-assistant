@@ -10,8 +10,12 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-SOURCE_PAGE = "https://www.mha.gov.in/en/commoncontent/new-criminal-laws"
+SOURCE_PAGES = [
+    "https://www.mha.gov.in/en/commoncontent/new-criminal-laws",
+    "https://www.legislative.gov.in/document/constitution-of-india-in-english",
+]
 OFFICIAL_PDFS = {
+    "constitution_of_india.pdf": "https://www.legislative.gov.in/static/uploads/2025/07/359f70a69695affb9d72f8393102bd2e.pdf",
     "bns.pdf": "https://www.mha.gov.in/sites/default/files/2024-04/250883_english_01042024.pdf",
     "bnss.pdf": "https://www.mha.gov.in/sites/default/files/2024-04/250884_2_english_01042024.pdf",
     "bsa.pdf": "https://www.mha.gov.in/sites/default/files/2024-04/250882_english_01042024_0.pdf",
@@ -68,7 +72,9 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    print(f"Downloading official PDFs linked from: {SOURCE_PAGE}")
+    print("Downloading official PDFs from these government sources:")
+    for source_page in SOURCE_PAGES:
+        print(f"  - {source_page}")
     failures = []
     for filename, url in OFFICIAL_PDFS.items():
         try:
