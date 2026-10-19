@@ -209,7 +209,8 @@ with st.sidebar:
     if api_ok:
         st.markdown('<span class="status-online">Online</span>', unsafe_allow_html=True)
     else:
-        st.markdown('<span class="status-offline">Offline - start FastAPI first</span>', unsafe_allow_html=True)
+        st.markdown('<span class="status-offline">Backend unavailable or not configured</span>', unsafe_allow_html=True)
+        st.caption("Check FastAPI logs, GROQ_API_KEY, Ollama, and the indexed legal corpus.")
         st.code("uvicorn main:app --reload --port 8000", language="bash")
 
     st.divider()
