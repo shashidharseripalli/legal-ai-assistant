@@ -174,10 +174,13 @@ async def analyze_impact(request: ImpactRequest):
         # Apply both session and document ID filters in vector search, not after top-k retrieval.
         search_filter: dict = {"session_id": request.session_id}
         if request.document_ids:
-            if len(request.document_ids) == 1:
-                search_filter["upload_id"] = request.document_ids[0]
-            else:
-                search_filter["upload_id"] = {"$in": request.document_ids}
+            # Chroma requires a single top-level where operator; combine predicates via $and.
+            search_filter = {
+                "$and": [
+                    {"session_id": request.session_id},
+                    {"upload_id": {"$in": request.document_ids}},
+                ]
+            }
         upload_retriever = get_upload_retriever(search_filter=search_filter)
         upload_docs = await asyncio.to_thread(_retrieve_documents, upload_retriever, request.problem)
         docs.extend(upload_docs)
