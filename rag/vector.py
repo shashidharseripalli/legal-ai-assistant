@@ -1,30 +1,64 @@
-"""
-rag/vector.py
--------------
-ChromaDB vectorstore helpers for:
-- Base legal corpus
-- User-uploaded documents
-"""
-
+"""ChromaDB vectorstore helpers with automatic local embedding selection."""
 import chromadb
-from langchain_community.embeddings import OllamaEmbeddings
-from langchain_community.vectorstores import Chroma
+import json
+import logging
+import urllib.error
+import urllib.request
 
+from langchain_community.embeddings import HuggingFaceEmbeddings, OllamaEmbeddings
+from langchain_community.vectorstores import Chroma
 from app.core.config import settings
 
+logger = logging.getLogger(__name__)
 _embeddings = None
 _base_vectorstore = None
 _upload_vectorstore = None
 _base_retriever = None
 
 
-def _get_embeddings() -> OllamaEmbeddings:
-    global _embeddings
-    if _embeddings is None:
-        _embeddings = OllamaEmbeddings(
+def _ollama_model_available() -> bool:
+    """Check whether the configured model is already installed in the local Ollama."""
+    url = settings.ollama_base_url.rstrip("/") + "/api/tags"
+    try:
+        with urllib.request.urlopen(url, timeout=2) as response:
+            models = json.loads(response.read().decode("utf-8")).get("models", [])
+        configured = settings.ollama_embed_model
+        return any(
+            model.get("name") == configured
+            or model.get("model") == configured
+            or model.get("name", "").split(":")[0] == configured.split(":")[0]
+            for model in models
+        )
+    except (OSError, ValueError, urllib.error.URLError):
+        return False
+
+
+def _create_embeddings():
+    """Use Ollama if its model is installed; otherwise use a free local HF model."""
+    if _ollama_model_available():
+        logger.info("Using installed Ollama embedding model '%s'.", settings.ollama_embed_model)
+        return OllamaEmbeddings(
             base_url=settings.ollama_base_url,
             model=settings.ollama_embed_model,
         )
+
+    logger.warning(
+        "Ollama/model '%s' is unavailable. Falling back to '%s' on CPU. "
+        "The first use downloads model weights and needs internet access.",
+        settings.ollama_embed_model,
+        settings.hf_embed_model,
+    )
+    return HuggingFaceEmbeddings(
+        model_name=settings.hf_embed_model,
+        model_kwargs={"device": "cpu"},
+        encode_kwargs={"normalize_embeddings": True},
+    )
+
+
+def _get_embeddings():
+    global _embeddings
+    if _embeddings is None:
+        _embeddings = _create_embeddings()
     return _embeddings
 
 
@@ -68,7 +102,6 @@ def get_retriever(search_filter: dict | None = None):
                 "filter": search_filter,
             },
         )
-
     if _base_retriever is None:
         _base_retriever = get_vectorstore().as_retriever(
             search_type="mmr",
@@ -88,7 +121,6 @@ def get_upload_retriever(search_filter: dict | None = None):
     }
     if search_filter:
         search_kwargs["filter"] = search_filter
-
     return get_upload_vectorstore().as_retriever(
         search_type="mmr",
         search_kwargs=search_kwargs,
