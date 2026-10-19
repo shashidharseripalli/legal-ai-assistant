@@ -1,5 +1,5 @@
 from app.api.chat import _retrieve_documents as chat_retrieve
-from app.api.documents import _to_sources
+from app.api.documents import _safe_filename, _to_sources
 
 
 class DummyRetrieverGetRelevant:
@@ -51,3 +51,9 @@ def test_to_sources_deduplicates_source_page_pairs():
     assert sources[0].source_file == "a.pdf"
     assert sources[0].page == 1
     assert sources[1].page == 2
+
+
+
+def test_safe_filename_strips_client_supplied_paths():
+    assert _safe_filename("../../private.txt") == "private.txt"
+    assert _safe_filename(r"C:\\temp\\private.txt") == "private.txt"
