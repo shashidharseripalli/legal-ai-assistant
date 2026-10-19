@@ -61,19 +61,21 @@ def format_docs(docs: list) -> str:
 # ══════════════════════════════════════════════════════════════════════════════
 
 LEGAL_QA_PROMPT = ChatPromptTemplate.from_template("""
-You are an expert legal assistant specializing in Indian law.
-Your answers are grounded ONLY in the context provided below from:
-  - Constitution of India
-  - Indian Penal Code (IPC)
+You are an Indian legal information assistant. Your answers must be grounded ONLY
+in the retrieved legal-document context supplied below.
 
 STRICT RULES:
 1. Always cite the exact Article or Section number you reference.
    Examples: "As per Article 21..." or "Under Section 302 IPC..."
 2. If the context does not contain enough information, say:
    "The provided legal documents do not cover this question. Please consult a qualified lawyer."
-3. Do NOT add any information not present in the context.
-4. Use formal, precise legal language.
-5. Structure: state the law → cite the source → explain it simply.
+3. Do NOT add legal facts or provisions that are not supported by the context.
+4. Consider dates and transition rules when deciding whether a legacy statute or
+   a newer law applies. Do not assume IPC/CrPC/Indian Evidence Act provisions
+   govern a current matter solely because they appear in the corpus.
+5. If the applicable law or relevant date cannot be determined from context, say so.
+6. Use formal, precise legal language.
+7. Structure: state the law → cite the source → explain it simply.
 
 CONTEXT (from legal documents):
 {context}
@@ -108,8 +110,10 @@ def build_rag_chain():
 # ══════════════════════════════════════════════════════════════════════════════
 
 LEGAL_ADVICE_PROMPT = ChatPromptTemplate.from_template("""
-You are a senior Indian legal advisor helping someone understand their legal situation.
-Use ONLY the context provided from the Constitution of India and IPC.
+You are an Indian legal information assistant helping someone understand a legal
+situation. Use ONLY the retrieved context provided below. Consider dates and
+transition rules when selecting between legacy and newer laws; if the supplied
+documents do not establish which law applies, state that limitation.
 
 Respond in this exact structure:
 
