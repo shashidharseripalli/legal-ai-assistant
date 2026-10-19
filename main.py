@@ -16,6 +16,7 @@ Docs:
 
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.chat import router as chat_router
@@ -23,20 +24,32 @@ from app.api.documents import router as documents_router
 from rag.rag_pipeline import get_chain, get_advice_chain
 
 
+_startup_ready = False
+_startup_error = None
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global _startup_ready, _startup_error
+    _startup_ready = False
+    _startup_error = None
     print("Starting AI Legal Assistant...")
     print("Loading ChromaDB vectorstore...")
     print("Connecting to Groq API (Llama-3.1-8b-instant)...")
     try:
         get_chain()
         get_advice_chain()
-        print("Legal AI Assistant is ready!\n")
+        _startup_ready = True
+        print("Legal AI Assistant is ready!\\n")
     except Exception as exc:
+        _startup_error = str(exc)
         print(f"Startup warning: {exc}")
-        print("App started, but chat endpoints require a valid GROQ_API_KEY.\n")
-    yield
-    print("Shutting down...")
+        print("Backend is not ready. Check GROQ_API_KEY and the startup logs.\\n")
+    try:
+        yield
+    finally:
+        _startup_ready = False
+        print("Shutting down...")
 
 
 app = FastAPI(
@@ -64,9 +77,14 @@ app.include_router(documents_router, prefix="/api/v1", tags=["Documents"])
 
 @app.get("/health", tags=["Health"])
 async def health():
-    return {
-        "status": "ok",
+    payload = {
+        "status": "ok" if _startup_ready else "not_ready",
+        "ready": _startup_ready,
+        "message": None if _startup_ready else "Backend initialization failed; check the FastAPI startup logs and configuration.",
         "llm": "llama-3.1-8b-instant (groq)",
         "embeddings": "nomic-embed-text (ollama)",
         "vectorstore": "chromadb",
     }
+    if not _startup_ready:
+        return JSONResponse(status_code=503, content=payload)
+    return payload
