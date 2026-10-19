@@ -5,7 +5,7 @@ Ask legal questions or describe your problem — get grounded answers with citat
 
 **Sources:** Official legal PDFs indexed from `data/raw/` (include the Constitution and current laws relevant to your use case)  
 **LLM:** Groq · Llama-3.1-8b-instant (free API, no RAM crash)  
-**Embeddings:** Ollama · nomic-embed-text (local, lightweight)  
+**Embeddings:** Ollama · nomic-embed-text when installed; otherwise free Hugging Face MiniLM on CPU  
 **Stack:** FastAPI · LangChain · ChromaDB · Streamlit · Python 3.10+
 
 ---
@@ -70,15 +70,10 @@ legal-ai-assistant/
 Go to **https://console.groq.com** → Sign up → API Keys → Create key.
 Takes 2 minutes. Free tier is generous.
 
-### 2. Install Ollama (for embeddings only)
-Download from **https://ollama.com** and install.
-On Windows it runs automatically in the background after installation.
+### 2. Embedding model selection (automatic)
+The app checks whether Ollama is reachable and whether `nomic-embed-text` is already installed. If it is, the app uses it. If not, it falls back to the free `sentence-transformers/all-MiniLM-L6-v2` model running locally on CPU. The first fallback use downloads the model weights, so internet access is required once. You do not have to install Ollama to use the fallback.
 
-### 3. Pull the embedding model
-```bash
-ollama pull nomic-embed-text
-```
-This is only ~270MB and uses very little RAM. It's only for embeddings, not the LLM.
+To use the Ollama model intentionally, install Ollama from **https://ollama.com** and run `ollama pull nomic-embed-text`.
 
 ### 4. Clone the repository
 ```bash
@@ -127,7 +122,7 @@ This downloads the Constitution of India from the official Legislative Departmen
 ```bash
 python scripts/ingest_documents.py
 ```
-This chunks the PDFs, embeds them with `nomic-embed-text`, and stores them in ChromaDB.
+This chunks the PDFs, automatically selects the available embedding model (Ollama if installed, otherwise Hugging Face MiniLM), and stores them in ChromaDB.
 Re-run only if you add new documents.
 
 ### 10. Start the FastAPI backend
