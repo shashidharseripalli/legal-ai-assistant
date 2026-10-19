@@ -86,6 +86,8 @@ def _to_sources(docs: list) -> list[SourceDocument]:
     for doc in docs:
         source_file = doc.metadata.get("source_file", "unknown")
         page = doc.metadata.get("page", "unknown")
+        if str(source_file).lower().endswith(".pdf") and isinstance(page, int):
+            page += 1
         key = (source_file, page)
         if key not in seen:
             seen.add(key)
@@ -105,7 +107,7 @@ async def upload_documents(session_id: str = Form(...), files: list[UploadFile] 
         raise HTTPException(status_code=400, detail="No files provided")
 
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000, chunk_overlap=150, separators=["\\n\\n", "\\n", ".", " "]
+        chunk_size=1000, chunk_overlap=150, separators=["\n\n", "\n", ".", " " ]
     )
     vectorstore = get_upload_vectorstore()
     uploaded_items: list[UploadItem] = []
@@ -127,7 +129,10 @@ async def upload_documents(session_id: str = Form(...), files: list[UploadFile] 
             raise HTTPException(status_code=400, detail=f"File too large: {safe_name}. Max {settings.max_upload_mb} MB")
 
         file_path = _save_uploaded_file(session_id, upload_file, content)
-        docs = await asyncio.to_thread(_load_to_documents, file_path)
+        try:
+            docs = await asyncio.to_thread(_load_to_documents, file_path)
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"Could not parse file: {safe_name}") from exc
         if not docs or not any(doc.page_content.strip() for doc in docs):
             raise HTTPException(status_code=400, detail=f"No readable text found in file: {safe_name}")
 
@@ -173,7 +178,8 @@ async def analyze_impact(request: ImpactRequest):
                 search_filter["upload_id"] = request.document_ids[0]
             else:
                 search_filter["upload_id"] = {"$in": request.document_ids}
-        upload_docs = await asyncio.to_thread(get_upload_retriever(search_filter=search_filter).__getattribute__("invoke"), request.problem)
+        upload_retriever = get_upload_retriever(search_filter=search_filter)
+        upload_docs = await asyncio.to_thread(_retrieve_documents, upload_retriever, request.problem)
         docs.extend(upload_docs)
 
     if not docs:
