@@ -67,7 +67,7 @@ def _retrieve_documents(retriever, query: str):
 @router.post("/chat", response_model=ChatResponse, summary="Ask a legal question")
 async def chat(request: ChatRequest):
     """
-    Ask anything about the Constitution of India or IPC.
+    Ask a question grounded in the indexed legal documents.
     Returns a cited answer grounded in the source documents.
     """
     if not request.question.strip():
