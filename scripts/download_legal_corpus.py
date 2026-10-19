@@ -92,9 +92,8 @@ def main() -> int:
         return 1
 
     print(
-        "\nNext: add constitution_of_india.pdf and any other authoritative "
-        "documents required for your use case, then run "
-        "'python scripts/ingest_documents.py'."
+        "\\nNext: run 'python scripts/ingest_documents.py'. Add legacy statutes "
+        "only if relevant to historical matters."
     )
     return 0
 
