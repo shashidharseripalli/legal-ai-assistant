@@ -42,8 +42,11 @@ legal-ai-assistant/
 │
 ├── data/
 │   └── raw/
-│       ├── constitution_of_india.pdf   ← ADD YOUR PDF HERE
-│       └── ipc.pdf                     ← ADD YOUR PDF HERE
+│       ├── constitution_of_india.pdf   ← add the Constitution
+│       ├── bns.pdf                     ← recommended for current criminal-law questions
+│       ├── bnss.pdf                    ← criminal procedure
+│       ├── bsa.pdf                     ← evidence law
+│       └── ipc.pdf                     ← legacy matters where applicable
 │
 ├── scripts/
 │   └── ingest_documents.py      ← Run once to chunk, embed, and store PDFs
