@@ -9,6 +9,7 @@ Run after starting the FastAPI backend:
 """
 
 import os
+from html import escape
 from uuid import uuid4
 
 import requests
@@ -185,12 +186,14 @@ def render_sources(sources: list):
         with st.expander(f"Sources ({len(sources)} documents referenced)", expanded=False):
             seen = set()
             for src in sources:
-                key = f"{src['source_file']}|{src['page']}"
+                source_file = escape(str(src.get("source_file", "unknown")))
+                page = escape(str(src.get("page", "unknown")))
+                key = f"{source_file}|{page}"
                 if key in seen:
                     continue
                 seen.add(key)
                 st.markdown(
-                    f'<span class="source-badge">File: {src["source_file"]} | Page {src["page"]}</span>',
+                    f'<span class="source-badge">File: {source_file} | Page {page}</span>',
                     unsafe_allow_html=True,
                 )
 
