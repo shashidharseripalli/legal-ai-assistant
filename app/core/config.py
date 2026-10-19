@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     # Ollama (embeddings)
     ollama_base_url: str = "http://localhost:11434"
     ollama_embed_model: str = "nomic-embed-text"
+    hf_embed_model: str = "sentence-transformers/all-MiniLM-L6-v2"
 
     # ChromaDB
     chroma_persist_dir: str = "vectorstore"
