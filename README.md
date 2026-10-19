@@ -121,7 +121,7 @@ Run:
 ```bash
 python scripts/download_legal_corpus.py
 ```
-This downloads the Bharatiya Nyaya Sanhita (BNS), Bharatiya Nagarik Suraksha Sanhita (BNSS), and Bharatiya Sakshya Adhiniyam (BSA) PDFs linked from the official [Ministry of Home Affairs New Criminal Laws page](https://www.mha.gov.in/en/commoncontent/new-criminal-laws). Add an authoritative Constitution of India PDF to `data/raw/` if you want constitutional questions. Add older statutes such as the IPC/CrPC/Indian Evidence Act when handling historical matters where they may still apply. The PDFs are not committed to this repository.
+This downloads the Constitution of India from the official Legislative Department and the Bharatiya Nyaya Sanhita (BNS), Bharatiya Nagarik Suraksha Sanhita (BNSS), and Bharatiya Sakshya Adhiniyam (BSA) from the [Ministry of Home Affairs New Criminal Laws page](https://www.mha.gov.in/en/commoncontent/new-criminal-laws). Add older statutes such as the IPC/CrPC/Indian Evidence Act when handling historical matters where they may still apply. The PDFs are not committed to this repository.
 
 ### 9. Run document ingestion (ONE TIME only)
 ```bash
