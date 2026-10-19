@@ -1,5 +1,9 @@
 name: Python CI
 
+concurrency:
+  group: python-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [main]
