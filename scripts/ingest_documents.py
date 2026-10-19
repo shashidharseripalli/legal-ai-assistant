@@ -21,7 +21,7 @@ from pathlib import Path
 import chromadb
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import OllamaEmbeddings
+from rag.vector import _create_embeddings
 from langchain_community.vectorstores import Chroma
 
 from app.core.config import settings
@@ -72,10 +72,7 @@ def ingest():
     print(f"\n🔢 Embedding with Ollama ({settings.ollama_embed_model})...")
     print("   This may take several minutes for large PDFs...")
 
-    embeddings = OllamaEmbeddings(
-        base_url=settings.ollama_base_url,
-        model=settings.ollama_embed_model,
-    )
+    embeddings = _create_embeddings()
 
     client = chromadb.PersistentClient(path=settings.chroma_persist_dir)
 
