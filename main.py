@@ -43,7 +43,7 @@ app = FastAPI(
     title="AI Legal Assistant",
     description=(
         "RAG-powered assistant for Indian law.\n\n"
-        "Sources: Constitution of India, Indian Penal Code (IPC)\n"
+        "Sources: legal documents added to the local RAG corpus\n"
         "LLM: Groq - Llama-3.1-8b-instant (free API)\n"
         "Embeddings: Ollama - nomic-embed-text (local)"
     ),
