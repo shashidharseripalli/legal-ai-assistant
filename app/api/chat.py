@@ -83,13 +83,13 @@ async def chat(request: ChatRequest):
             chain.invoke, {"question": request.question}
         )
 
-        sources = [
-            SourceDocument(
-                source_file=doc.metadata.get("source_file", "unknown"),
-                page=doc.metadata.get("page", "unknown"),
-            )
-            for doc in source_docs
-        ]
+        sources = []
+        for doc in source_docs:
+            source_file = doc.metadata.get("source_file", "unknown")
+            page = doc.metadata.get("page", "unknown")
+            if str(source_file).lower().endswith(".pdf") and isinstance(page, int):
+                page += 1
+            sources.append(SourceDocument(source_file=source_file, page=page))
 
         return ChatResponse(answer=answer, sources=sources)
 
