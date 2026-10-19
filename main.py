@@ -40,11 +40,11 @@ async def lifespan(app: FastAPI):
         get_chain()
         get_advice_chain()
         _startup_ready = True
-        print("Legal AI Assistant is ready!\\n")
+        print("Legal AI Assistant is ready!")
     except Exception as exc:
         _startup_error = str(exc)
         print(f"Startup warning: {exc}")
-        print("Backend is not ready. Check GROQ_API_KEY and the startup logs.\\n")
+        print("Backend is not ready. Check GROQ_API_KEY and the startup logs.")
     try:
         yield
     finally:
