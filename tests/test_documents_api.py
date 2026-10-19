@@ -41,9 +41,9 @@ def test_retrieve_documents_invoke():
 
 def test_to_sources_deduplicates_source_page_pairs():
     docs = [
+        DummyDoc("a.pdf", 0),
+        DummyDoc("a.pdf", 0),
         DummyDoc("a.pdf", 1),
-        DummyDoc("a.pdf", 1),
-        DummyDoc("a.pdf", 2),
     ]
     sources = _to_sources(docs)
 
