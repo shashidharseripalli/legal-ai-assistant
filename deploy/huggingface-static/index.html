@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A public demo frontend for an Indian-law RAG assistant.">
+  <title>AI Legal Assistant</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0d1b2a;--panel:#12263a;--line:#284866;--gold:#c8922a;--text:#eef3f8;--muted:#a9bdcf;--blue:#1a4a7a}
+    *{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#0d1b2a,#142c42);font:16px/1.55 system-ui,-apple-system,Segoe UI,sans-serif;color:var(--text)}
+    header,main,footer{max-width:960px;margin:auto;padding:24px}header{padding-top:36px}h1{margin:0 0 8px;font-size:clamp(2rem,5vw,3rem)}h2{margin-top:0}p{color:var(--muted)}
+    .panel{background:rgba(18,38,58,.94);border:1px solid var(--line);border-radius:16px;padding:22px;margin:18px 0;box-shadow:0 12px 32px #0002}
+    label{display:block;font-weight:650;margin:12px 0 6px}input,textarea,select{width:100%;padding:12px;border-radius:9px;border:1px solid #40617b;background:#0a1724;color:var(--text);font:inherit}
+    textarea{min-height:112px;resize:vertical}button{margin-top:14px;padding:12px 18px;border-radius:9px;border:1px solid var(--gold);background:var(--gold);color:#111827;font-weight:750;cursor:pointer}button:disabled{opacity:.55;cursor:wait}
+    .muted{font-size:.92rem;color:var(--muted)}.status{padding:12px;border-radius:8px;background:#0a1724;border:1px solid var(--line);white-space:pre-wrap;overflow-wrap:anywhere}
+    .notice{border-left:4px solid var(--gold);padding:10px 14px;background:#1c2d3d;border-radius:6px}a{color:#9bd1ff}footer{font-size:.9rem;color:var(--muted)}.row{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:650px){.row{grid-template-columns:1fr}header,main,footer{padding:18px}}
+  </style>
+</head>
+<body>
+  <header>
+    <p>PUBLIC DEMO · INDIAN LAW</p>
+    <h1>⚖️ AI Legal Assistant</h1>
+    <p>Ask questions about Indian law and explore grounded legal answers with source citations. This static free demo needs a separately hosted API to generate live answers.</p>
+  </header>
+  <main>
+    <section class="panel">
+      <h2>Connect the live API</h2>
+      <p class="notice">Hugging Face Static Spaces host HTML/CSS/JavaScript only. The Python FastAPI + ChromaDB backend is not executed by this page. Deploy the backend separately, then paste its public HTTPS base URL below. Never put a Groq API key in this page.</p>
+      <label for="api">Backend base URL</label>
+      <input id="api" type="url" placeholder="https://your-api.example.com" autocomplete="url">
+      <p class="muted">Expected endpoints: <code>/health</code>, <code>/api/v1/chat</code> and <code>/api/v1/advice</code>. The API must allow browser CORS requests from this Space.</p>
+      <button id="check">Check connection</button>
+      <div id="health" class="status" role="status" aria-live="polite">No API configured. The interface is published, but answers are disabled until a backend URL is set.</div>
+    </section>
+    <section class="panel">
+      <h2>Ask a legal question</h2>
+      <label for="question">Question</label>
+      <textarea id="question" placeholder="For example: What does Article 21 of the Constitution protect?"></textarea>
+      <button id="ask">Ask question</button>
+      <div id="answer" class="status" role="status" aria-live="polite">Your answer and citations will appear here after a backend is connected.</div>
+    </section>
+    <section class="panel">
+      <h2>Describe a legal problem</h2>
+      <label for="problem">Situation</label>
+      <textarea id="problem" placeholder="Describe the situation without including unnecessary personal or sensitive information."></textarea>
+      <button id="advise">Get general information</button>
+      <div id="advice" class="status" role="status" aria-live="polite">Structured general information will appear here after a backend is connected.</div>
+    </section>
+    <section class="panel">
+      <h2>About this demo</h2>
+      <p>Designed as the free static front end for the <a href="https://github.com/shashidharseripalli/legal-ai-assistant" target="_blank" rel="noopener noreferrer">Legal AI Assistant source repository</a>. Answers depend on the corpus indexed by the connected backend. Verify current law against official publications.</p>
+      <p class="notice">Educational information only, not legal advice. Do not rely on generated text as a substitute for a qualified lawyer. Do not submit confidential, privileged, or identifying information.</p>
+    </section>
+  </main>
+  <footer>AI Legal Assistant · Static frontend · No API key is stored in this page.</footer>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const apiBase = () => $('api').value.trim().replace(/\/+$/, '');
+  const show = (id, text) => { $(id).textContent = text; };
+  const request = async (url, body) => {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+    const raw = await response.text();
+    let data;
+    try { data = JSON.parse(raw); } catch { data = {detail: raw}; }
+    if (!response.ok) throw new Error(data.detail || ('HTTP ' + response.status));
+    return data;
+  };
+  $('check').addEventListener('click', async () => {
+    const base = apiBase();
+    if (!base) return show('health', 'Enter a backend HTTPS URL first.');
+    show('health', 'Checking backend…');
+    try {
+      const res = await fetch(base + '/health');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || ('HTTP ' + res.status));
+      show('health', 'Backend connected: ' + JSON.stringify(data, null, 2));
+    } catch (err) {
+      show('health', 'Connection failed: ' + err.message + '\nCheck the URL, HTTPS, CORS settings, and backend health.');
+    }
+  });
+  $('ask').addEventListener('click', async () => {
+    const base = apiBase(), question = $('question').value.trim();
+    if (!base) return show('answer', 'Enter a backend HTTPS URL first.');
+    if (!question) return show('answer', 'Enter a question first.');
+    $('ask').disabled = true; show('answer', 'Generating answer…');
+    try {
+      const data = await request(base + '/api/v1/chat', {question});
+      const citations = (data.sources || []).map(s => '\n• ' + (s.source_file || 'unknown') + ' — page ' + (s.page ?? 'unknown')).join('');
+      show('answer', (data.answer || 'The API returned no answer.') + (citations ? '\n\nSources:' + citations : ''));
+    } catch (err) { show('answer', 'Request failed: ' + err.message); }
+    finally { $('ask').disabled = false; }
+  });
+  $('advise').addEventListener('click', async () => {
+    const base = apiBase(), problem = $('problem').value.trim();
+    if (!base) return show('advice', 'Enter a backend HTTPS URL first.');
+    if (!problem) return show('advice', 'Describe the problem first.');
+    $('advise').disabled = true; show('advice', 'Preparing general information…');
+    try {
+      const data = await request(base + '/api/v1/advice', {problem});
+      const citations = (data.sources || []).map(s => '\n• ' + (s.source_file || 'unknown') + ' — page ' + (s.page ?? 'unknown')).join('');
+      show('advice', (data.advice || 'The API returned no advice.') + (citations ? '\n\nSources:' + citations : ''));
+    } catch (err) { show('advice', 'Request failed: ' + err.message); }
+    finally { $('advise').disabled = false; }
+  });
+})();
+</script>
+</body>
+</html>
