@@ -262,6 +262,13 @@ MIT License
 
 ---
 
+
+## Free public frontend: Hugging Face Static Space
+
+A static deployment package is available in [`deploy/huggingface-static/`](deploy/huggingface-static/) and the exact steps are in [`docs/deploy-huggingface-static.md`](docs/deploy-huggingface-static.md).
+
+**Important:** the Hugging Face Static SDK serves HTML/CSS/JavaScript and does not run the Python FastAPI + ChromaDB backend. The free static public page can be deployed by itself; live AI answers require a separately hosted HTTPS API configured in the page. Keep `GROQ_API_KEY` on the backend host only, never in this public repo or browser code.
+
 ## Docker
 
 You can run both backend and Streamlit UI with Docker Compose.
